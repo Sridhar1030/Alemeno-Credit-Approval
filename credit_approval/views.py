@@ -6,6 +6,8 @@ from django.db import transaction
 from django.db.models import Sum, F
 from django.utils import timezone
 from datetime import timedelta, datetime # Import datetime for date parsing if needed
+from decimal import Decimal # Import Decimal for precise calculations
+
 
 from .models import Customer, Loan
 from .serializers import (
@@ -33,20 +35,42 @@ def calculate_emi(principal, annual_interest_rate, tenure_months):
     Calculates the Equated Monthly Installment (EMI) using the compound interest formula.
     EMI = P * R * (1 + R)^N / ((1 + R)^N - 1)
     Where:
-    P = Principal loan amount
-    R = Monthly interest rate (annual_interest_rate / 12 / 100)
-    N = Loan tenure in months
+    P = Principal loan amount (Decimal)
+    R = Monthly interest rate (Decimal)
+    N = Loan tenure in months (int)
     """
-    if annual_interest_rate == 0:
-        return principal / tenure_months
+    # Ensure principal is a Decimal
+    principal = Decimal(str(principal))
+
+    # Convert annual_interest_rate to Decimal for consistent calculations
+    annual_interest_rate_decimal = Decimal(str(annual_interest_rate))
+
+    if annual_interest_rate_decimal == 0:
+        # Handle zero interest rate case with Decimal division
+        return round(principal / Decimal(str(tenure_months)), 2)
     
-    monthly_interest_rate = (annual_interest_rate / 12) / 100
+    # Calculate monthly interest rate as a Decimal
+    monthly_interest_rate = (annual_interest_rate_decimal / Decimal('12')) / Decimal('100')
     
+    # Perform calculations using Decimal types
     try:
-        emi = principal * monthly_interest_rate * (1 + monthly_interest_rate)**tenure_months / \
-              ((1 + monthly_interest_rate)**tenure_months - 1)
-    except ZeroDivisionError:
-        return principal / tenure_months
+        # (1 + R)^N
+        power_term = (Decimal('1') + monthly_interest_rate)**tenure_months
+        
+        # P * R * (1 + R)^N
+        numerator = principal * monthly_interest_rate * power_term
+        
+        # ((1 + R)^N - 1)
+        denominator = power_term - Decimal('1')
+
+        if denominator == 0: # Avoid division by zero for very small rates/large tenures
+            return round(principal / Decimal(str(tenure_months)), 2)
+
+        emi = numerator / denominator
+    except Exception as e:
+        # Fallback for unexpected calculation errors, though less likely with Decimal
+        print(f"Error in EMI calculation: {e}")
+        return round(principal / Decimal(str(tenure_months)), 2)
 
     return round(emi, 2)
 
