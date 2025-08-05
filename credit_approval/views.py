@@ -6,7 +6,8 @@ from django.db import transaction
 from django.db.models import Sum, F
 from django.utils import timezone
 from datetime import timedelta
-from decimal import Decimal, getcontext, ROUND_CEILING
+# Removed NaN and Infinity from direct import, as they are not importable names
+from decimal import Decimal, getcontext, ROUND_CEILING, InvalidOperation 
 import math
 import pandas as pd
 
@@ -27,34 +28,51 @@ getcontext().prec = 50 # Set high precision for intermediate Decimal calculation
 def calculate_approved_limit(monthly_salary):
     monthly_salary = Decimal(str(monthly_salary))
     raw_limit = Decimal('36') * monthly_salary
-    # If raw_limit is positive, round up to the nearest lakh. Otherwise, it's 0.
     if raw_limit > 0:
-        return (raw_limit / Decimal('100000')).to_integral_value(rounding=ROUND_CEILING) * Decimal('100000')
-    return Decimal('0') # If monthly_salary is 0 or negative, approved_limit is 0
+        lakhs = (raw_limit / Decimal('100000')).to_integral_value(rounding=ROUND_CEILING)
+        return lakhs * Decimal('100000')
+    return Decimal('0')
 
 def calculate_emi(principal, annual_interest_rate, tenure_months):
     principal = Decimal(str(principal))
-    annual_interest_rate_decimal = Decimal(str(annual_interest_rate))
+    
+    try:
+        # Convert annual_interest_rate to Decimal, handling potential non-numeric input
+        annual_interest_rate_decimal = Decimal(str(annual_interest_rate))
+    except (TypeError, ValueError, InvalidOperation):
+        # If conversion fails, treat as 0 interest for calculation purposes
+        annual_interest_rate_decimal = Decimal('0') 
+
+    # Defensive check for NaN or Infinity values after conversion
+    # These methods are called on the Decimal object, not imported names
+    if annual_interest_rate_decimal.is_nan() or annual_interest_rate_decimal.is_infinite():
+        # If interest rate is invalid, fall back to simple principal / tenure
+        return (principal / Decimal(str(tenure_months))).quantize(Decimal('0.01'))
 
     if annual_interest_rate_decimal == 0:
         return (principal / Decimal(str(tenure_months))).quantize(Decimal('0.01'))
     
-    # Calculate monthly interest rate with higher precision
-    # Using '0.000000000000000000000000000001' as quantize value for more decimal places
-    monthly_interest_rate = (annual_interest_rate_decimal / Decimal('1200')).quantize(Decimal('0.000000000000000000000000000001'))
+    # Calculate monthly interest rate without immediate quantize on this line
+    # Let the global getcontext().prec handle the intermediate precision
+    monthly_interest_rate = annual_interest_rate_decimal / Decimal('1200')
     
     try:
         power_term = (Decimal('1') + monthly_interest_rate)**tenure_months
         numerator = principal * monthly_interest_rate * power_term
         denominator = power_term - Decimal('1')
-        if denominator == 0:
+        
+        if denominator == 0: # Avoid division by zero
             return (principal / Decimal(str(tenure_months))).quantize(Decimal('0.01'))
+        
         emi = numerator / denominator
-    except Exception as e:
-        print(f"Error in EMI calculation: {e}")
+    except InvalidOperation as e: # Catch InvalidOperation specifically for Decimal arithmetic
+        print(f"Decimal InvalidOperation in EMI calculation: {e} for principal={principal}, rate={annual_interest_rate_decimal}, tenure={tenure_months}")
+        return (principal / Decimal(str(tenure_months))).quantize(Decimal('0.01'))
+    except Exception as e: # Catch any other unexpected errors
+        print(f"General error in EMI calculation: {e} for principal={principal}, rate={annual_interest_rate_decimal}, tenure={tenure_months}")
         return (principal / Decimal(str(tenure_months))).quantize(Decimal('0.01'))
 
-    return emi.quantize(Decimal('0.01')) # Quantize to 2 decimal places at the end
+    return emi.quantize(Decimal('0.01')) # Quantize the final result to 2 decimal places
 
 def calculate_credit_score(customer_id):
     try:
@@ -179,7 +197,6 @@ class CheckEligibilityView(APIView):
                 "interest_rate": interest_rate, "corrected_interest_rate": corrected_interest_rate,
                 "tenure": tenure, "monthly_installment": monthly_installment,
             }
-            # Ensure message is always included if not approved
             if not approval:
                 response_data['message'] = message or "Loan not approved due to eligibility criteria."
             
@@ -236,7 +253,6 @@ class CreateLoanView(APIView):
                         message = "Requested loan amount exceeds customer's approved limit."
                     else:
                         monthly_installment = calculate_emi(loan_amount, corrected_interest_rate, tenure)
-                        # FIX: Changed 'approval = False' to 'loan_approved = False'
                         if total_current_active_emis + monthly_installment > (customer.monthly_salary / Decimal('2')):
                             loan_approved = False
                             message = "Sum of all current EMIs exceeds 50% of monthly salary even with corrected rate."
