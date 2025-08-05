@@ -1,7 +1,7 @@
 # Dockerfile
 
-# Use the official Python image as the base image
-FROM python:3.11-slim-buster
+# Use the official Python image based on Debian Bookworm (current stable)
+FROM python:3.11-slim-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -17,7 +17,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file and install Python dependencies
-# This step is done separately to leverage Docker's layer caching
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -28,5 +27,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Command to run the Django development server
-# This will be overridden by docker-compose, but good for standalone testing
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

@@ -1,0 +1,37 @@
+# docker-compose.yml
+version: "3.8"
+
+services:
+    db:
+        image: postgres:13-alpine # Use a lightweight PostgreSQL image
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/ # Persistent data volume for PostgreSQL
+        environment:
+            POSTGRES_DB: credit_approval_db # Database name
+            POSTGRES_USER: user # Database user
+            POSTGRES_PASSWORD: password # Database password
+        ports:
+            - "5432:5432" # Expose PostgreSQL port (optional, but useful for direct connection from host)
+        healthcheck: # Health check to ensure DB is ready before web app starts
+            test:
+                ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    web:
+        build: . # Build the image from the Dockerfile in the current directory
+        command: python manage.py runserver 0.0.0.0:8000 # Command to run Django
+        volumes:
+            - .:/app # Mount the current directory into the container for live code changes
+        ports:
+            - "8000:8000" # Expose Django app port
+        environment:
+            # Pass PostgreSQL connection string to Django app
+            DATABASE_URL: postgres://user:password@db:5432/credit_approval_db
+        depends_on:
+            db:
+                condition: service_healthy # Ensure db service is healthy before web starts
+
+volumes:
+    postgres_data: # Define the named volume for persistent PostgreSQL data
