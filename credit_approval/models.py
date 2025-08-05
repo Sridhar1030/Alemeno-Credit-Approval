@@ -4,15 +4,11 @@ from django.core.validators import MinValueValidator
 import uuid
 
 class Customer(models.Model):
-    # Django's internal primary key (UUID for good practice)
     customer_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    # Field to store the original integer Customer ID from the CSV for mapping
     original_customer_csv_id = models.IntegerField(unique=True, null=True, blank=True)
-
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    age = models.IntegerField()  # Added 'age' field as per CSV structure
+    age = models.IntegerField()
     phone_number = models.CharField(max_length=15, unique=True)
     monthly_salary = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     approved_limit = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
@@ -26,12 +22,10 @@ class Customer(models.Model):
         ordering = ['first_name', 'last_name']
 
 class Loan(models.Model):
-    # Changed loan_id to IntegerField and primary_key=True to match CSV structure
-    loan_id = models.IntegerField(primary_key=True)
+    # FINAL FIX: Use AutoField for auto-incrementing integer primary key
+    loan_id = models.AutoField(primary_key=True)
     
-    # ForeignKey remains linked to our Customer model's UUID primary key
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='loans')
-    
     loan_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     tenure = models.IntegerField(validators=[MinValueValidator(1)])
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(0)])

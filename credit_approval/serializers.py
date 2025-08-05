@@ -1,3 +1,4 @@
+# credit_approval/serializers.py
 from rest_framework import serializers
 from .models import Customer, Loan
 
@@ -33,7 +34,8 @@ class CheckEligibilityResponseSerializer(serializers.Serializer):
     interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
     corrected_interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
     tenure = serializers.IntegerField()
-    monthly_installment = serializers.DecimalField(max_digits=12, decimal_places=2)
+    monthly_installment = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True) # Allow null for rejected loans
+    message = serializers.CharField(allow_null=True, required=False) # Added message field
 
 class CreateLoanRequestSerializer(serializers.Serializer):
     customer_id = serializers.UUIDField()
@@ -42,14 +44,14 @@ class CreateLoanRequestSerializer(serializers.Serializer):
     tenure = serializers.IntegerField(min_value=1)
 
 class CreateLoanResponseSerializer(serializers.Serializer):
-    loan_id = serializers.UUIDField(allow_null=True)
+    loan_id = serializers.IntegerField(allow_null=True) # Changed to IntegerField
     customer_id = serializers.UUIDField()
     loan_approved = serializers.BooleanField()
     message = serializers.CharField(allow_null=True, required=False)
     monthly_installment = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
 
 class ViewLoanResponseSerializer(serializers.Serializer):
-    loan_id = serializers.UUIDField()
+    loan_id = serializers.IntegerField() # Changed to IntegerField
     customer = serializers.JSONField() # Will contain customer details as a JSON object
     loan_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
@@ -57,7 +59,7 @@ class ViewLoanResponseSerializer(serializers.Serializer):
     tenure = serializers.IntegerField()
 
 class ViewCustomerLoansResponseSerializer(serializers.Serializer):
-    loan_id = serializers.UUIDField()
+    loan_id = serializers.IntegerField() # Changed to IntegerField
     loan_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
     monthly_installment = serializers.DecimalField(max_digits=12, decimal_places=2)
