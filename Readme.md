@@ -244,62 +244,118 @@ All tests should pass successfully.
 
 ---
 
-## Alternative Setup: Docker Pull Method (Advanced)
+Got it! Here’s the **corrected "Alternative Setup (Manual Docker Run Method)"** section integrated into your documentation in a polished, submission-ready format:
 
-> **Note:** This is NOT the recommended approach for assignment submissions.
+---
+
+## Alternative Setup: Running with `docker run` (Manual Pull & Network Mode)
+
+> **Note:** I have pushed my docker image on docker hub https://hub.docker.com/r/sridhar1030/alemenocreditapproval-web/tags.
+
+This setup involves **manually pulling images**, **creating a custom Docker network**, and **running PostgreSQL and Django containers separately** using `docker run`. You'll also need to manually execute migrations and data ingestion inside the Django container.
+
+---
 
 ### Steps:
 
-1. Ensure `customer_data.xlsx` and `loan_data.xlsx` are in the working directory.
-2. Create a **docker-compose.yml** with the following:
-
-```yaml
-version: '3.8'
-services:
-  db:
-    image: postgres:13-alpine
-    environment:
-      POSTGRES_DB: credit_approval_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-
-  web:
-    image: sridhar1030/alemenocreditapproval-web:latest
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgres://user:password@db:5432/credit_approval_db
-    depends_on:
-      db:
-        condition: service_healthy
-
-volumes:
-  postgres_data:
-```
-
-3. Run:
+### 1. **Pull Docker Images**
 
 ```bash
-docker-compose up
+docker pull postgres:13-alpine
+docker pull sridhar1030/alemenocreditapproval-web:latest
 ```
 
-4. Run migrations:
+---
+
+### 2. **Create a Custom Docker Network**
+
+This allows the Django and PostgreSQL containers to communicate by container name.
 
 ```bash
-docker-compose exec web python manage.py migrate
+docker network create my-credit-app-network
 ```
 
-5. Ingest data:
+---
+
+### 3. **Run PostgreSQL Container**
 
 ```bash
-docker-compose exec web python manage.py ingest_data
+docker run -d \
+  --name my-credit-app-db \
+  --network my-credit-app-network \
+  -e POSTGRES_DB=credit_approval_db \
+  -e POSTGRES_USER=user \
+  -e POSTGRES_PASSWORD=password \
+  -v postgres_data:/var/lib/postgresql/data \
+  postgres:13-alpine
 ```
 
+* `--name my-credit-app-db`: Container name (used in Django's DATABASE\_URL).
+* `--network my-credit-app-network`: Connects container to custom network.
+* `-v postgres_data`: Persists PostgreSQL data locally.
+
+---
+
+### 4. **Run Django App Container**
+
+```bash
+docker run -d \
+  --name my-credit-app-web \
+  --network my-credit-app-network \
+  -p 8000:8000 \
+  -e DATABASE_URL="postgres://user:password@my-credit-app-db:5432/credit_approval_db" \
+  sridhar1030/alemenocreditapproval-web:latest \
+  python manage.py runserver 0.0.0.0:8000
+```
+
+* `-p 8000:8000`: Exposes port 8000 for API access.
+* `-e DATABASE_URL`: Points Django to PostgreSQL using the **PostgreSQL container name (my-credit-app-db)**.
+* `--network my-credit-app-network`: Ensures both containers can communicate.
+* The command `python manage.py runserver` starts the Django development server.
+
+---
+
+### 5. **Run Database Migrations**
+
+Execute inside the running **Django app container**:
+
+```bash
+docker exec my-credit-app-web python manage.py migrate
+```
+
+---
+
+### 6. **Ingest Initial Data (Excel Files)**
+
+Ensure `customer_data.xlsx` and `loan_data.xlsx` are present inside the app container. If they are not baked into the Docker image, you need to mount them using `-v` during `docker run` (or copy them using `docker cp`).
+
+To ingest data:
+
+```bash
+docker exec my-credit-app-web python manage.py ingest_data
+```
+
+---
+
+### 7. **Access the API**
+
+Once the above steps are completed, your backend is running at:
+
+```
+http://localhost:8000/api/
+```
+
+---
+
+### Important Notes
+
+* **DATABASE\_URL syntax must exactly match:**
+  `postgres://<DB_USER>:<DB_PASSWORD>@<POSTGRES_CONTAINER_NAME>:5432/<DB_NAME>`
+* Ensure that **PostgreSQL is fully up and running** before launching Django.
+* This method skips Docker Compose orchestration and mimics a production-like container setup workflow.
+* For persistent storage, Docker Volume `postgres_data` is mounted.
+
+---
 ---
 
 ## General Guidelines & Notes
