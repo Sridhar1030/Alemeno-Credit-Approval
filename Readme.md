@@ -94,7 +94,7 @@ This project implements a backend Credit Approval System as an assignment for **
 ### Cloning the Repository
 
 ```bash
-git clone <your-github-repo-url>
+git clone https://github.com/Sridhar1030/Alemeno-Credit-Approval
 cd credit_approval_system
 ```
 
@@ -243,11 +243,9 @@ All tests should pass successfully.
 
 ---
 
-Got it! Here’s the **corrected "Alternative Setup (Manual Docker Run Method)"** section integrated into your documentation in a polished, submission-ready format:
-
 ---
 
-## Alternative Setup: Running with `docker run` (Manual Pull & Network Mode)
+## Alternative Setup: Running with `docker run` **For not cloning the repo** (Manual Pull & Network Mode)
 
 > **Note:** I have pushed my docker image on docker hub https://hub.docker.com/r/sridhar1030/alemenocreditapproval-web/tags.
 
