@@ -1,4 +1,3 @@
-Here’s a polished and professional version of your **Alemeno Credit Approval System - Backend Documentation**:
 
 ---
 
